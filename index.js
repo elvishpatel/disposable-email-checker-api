@@ -2,6 +2,7 @@
 const express = require('express');
 // Import the file system library to read/write our data
 const fs = require('fs');
+const cors = require('cors');
 
 // Initialize the Express app
 const app = express();
@@ -11,8 +12,30 @@ const PORT = process.env.PORT || 3000;
 // Middleware to parse JSON request bodies
 app.use(express.json());
 
-// --- IMPORTANT: Trust proxy to get correct IP on hosting platforms ---
-// Services like Render or Heroku use a proxy. This line ensures req.ip gives the real user IP.
+// Define the websites that are allowed to access your API
+const allowedOrigins = [
+  'https://disposable-email-api.netlify.app', // Your live frontend
+];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests from the whitelisted domains
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('This origin is not allowed by CORS'));
+    }
+  },
+  optionsSuccessStatus: 200 // For legacy browser support
+};
+
+// Apply the CORS middleware to all incoming requests
+app.use(cors(corsOptions));
+// Specifically handle the browser's preflight 'OPTIONS' request
+app.options('*', cors(corsOptions));
+// --- END of CORS Configuration ---
+
+
 app.set('trust proxy', 1);
 
 // --- Load Domains into a High-Speed Set ---
@@ -119,7 +142,7 @@ app.post('/v1/verify', rateLimiter, (req, res) => {
         res.status(200).json({
             status: "valid",
             message: "Email domain appears to be valid.",
-            email: email,
+            email: email,  
             domain: domain,
             is_disposable: false
         });
