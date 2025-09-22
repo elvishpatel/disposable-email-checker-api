@@ -2,6 +2,7 @@
 const express = require('express');
 // Import the file system library to read/write our data
 const fs = require('fs');
+// --- NEW: Import the cors library ---
 const cors = require('cors');
 
 // Initialize the Express app
@@ -12,9 +13,11 @@ const PORT = process.env.PORT || 3000;
 // Middleware to parse JSON request bodies
 app.use(express.json());
 
+// --- NEW: CORS Configuration ---
 // Define the websites that are allowed to access your API
 const allowedOrigins = [
   'https://disposable-email-api.netlify.app', // Your live frontend
+  // You can add your local development URL here if needed, e.g., 'http://127.0.0.1:5500'
 ];
 
 const corsOptions = {
@@ -31,11 +34,11 @@ const corsOptions = {
 
 // Apply the CORS middleware to all incoming requests
 app.use(cors(corsOptions));
-// Specifically handle the browser's preflight 'OPTIONS' request
-app.options('*', cors(corsOptions));
 // --- END of CORS Configuration ---
 
 
+// --- IMPORTANT: Trust proxy to get correct IP on hosting platforms ---
+// Services like Render or Heroku use a proxy. This line ensures req.ip gives the real user IP.
 app.set('trust proxy', 1);
 
 // --- Load Domains into a High-Speed Set ---
