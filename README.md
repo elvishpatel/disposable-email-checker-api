@@ -28,7 +28,6 @@ Built with Node.js + Express. Hosted on Render. No database required — everyth
 - [Rate Limits](#rate-limits)
 - [Response Headers](#response-headers)
 - [Error Codes](#error-codes)
-- [Blocklist](#blocklist)
 - [Self-Hosting](#self-hosting)
 - [Environment Variables](#environment-variables)
 - [Changelog](#changelog)
