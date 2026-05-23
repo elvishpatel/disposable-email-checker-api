@@ -398,32 +398,6 @@ Every response from `/v1/*` includes these headers:
 
 ---
 
-## Blocklist
-
-The `disposable_domains.json` file is a merged, deduplicated list from three sources:
-
-| Source                                                                                      | Domains  |
-|---------------------------------------------------------------------------------------------|----------|
-| [disposable-email-domains/disposable-email-domains](https://github.com/disposable-email-domains/disposable-email-domains) | ~5,467   |
-| [7c/fakefilter](https://github.com/7c/fakefilter)                                           | ~4,436   |
-| Original curated list                                                                       | ~4,725   |
-| **Merged & deduplicated total**                                                             | **9,241** |
-
-To refresh the list, re-run the merge script and redeploy:
-
-```bash
-# Fetch latest from both sources and merge
-curl -s https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/master/disposable_email_blocklist.conf > /tmp/list1.txt
-curl -s https://raw.githubusercontent.com/7c/fakefilter/main/txt/data.txt > /tmp/list2.txt
-
-python3 merge_domains.py   # outputs disposable_domains.json
-git add disposable_domains.json
-git commit -m "chore: refresh blocklist"
-git push
-```
-
----
-
 ## Self-Hosting
 
 ### Prerequisites
@@ -525,21 +499,10 @@ webhooks.json       # Registered webhook endpoints
 ## Changelog
 
 ### v2.1.0
-- **Domains:** Blocklist expanded from 4,725 → 9,241 (merged two additional community sources)
 - **Rate limiter:** Replaced file-based storage with in-memory `Map`; fixed window to 1 hour (was 24h); proper `X-RateLimit-Reset` (Unix epoch) and `Retry-After` headers
 - **Confidence:** Added 4 new signals — temp MX provider check (30 signatures), single-char local part, excessive dots, numeric-heavy domain; added `label` field (`very_low` → `very_high`)
 - **New endpoint:** `GET /v1/rate-limit/status` — check quota without burning a request
 - **Bulk webhook:** `bulk.complete` event now fires after every bulk request
-- **Frontend:** Full redesign — 3-mode demo (single / bulk / domain), confidence bar, rate limit pill, mobile hamburger nav, updated all docs to v2.1 response shapes
-
-### v2.0.0
-- Bulk verify endpoint (up to 50 emails)
-- Domain-only check endpoint
-- DNS + MX verification
-- Basic confidence scoring
-- Webhook support
-- API key provisioning
-- Analytics endpoint
 
 ### v1.0.0
 - Initial release — single email verify, blocklist check only
