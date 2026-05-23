@@ -29,8 +29,6 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-app.options('*', cors());
-
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
