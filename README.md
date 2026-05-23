@@ -37,7 +37,6 @@ Built with Node.js + Express. Hosted on Render. No database required — everyth
 
 ## Features
 
-- **9,241 blocked domains** — merged from three open-source community blocklists
 - **Confidence scoring** — 0–100 score with `very_low` → `very_high` label across 8 independent signals
 - **DNS + MX verification** — checks if the domain actually exists and can receive email
 - **Bulk endpoint** — verify up to 50 emails in a single request
