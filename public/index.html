@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EmailGuard API — Disposable Email Detection</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    /* ── Tokens ───────────────────────────────────────────────────────── */
+    :root {
+      --bg:          #0e1117;
+      --bg2:         #161b27;
+      --bg3:         #1e2535;
+      --border:      #2a3347;
+      --border2:     #374158;
+      --teal:        #2dd4bf;
+      --teal-dim:    #1a8a7d;
+      --blue:        #60a5fa;
+      --red:         #f87171;
+      --yellow:      #fbbf24;
+      --green:       #34d399;
+      --text:        #e2e8f0;
+      --muted:       #64748b;
+      --muted2:      #94a3b8;
+      --font-mono:   'JetBrains Mono', monospace;
+      --font-display:'Syne', sans-serif;
+      --radius:      10px;
+      --transition:  0.22s ease;
+    }
+
+    /* ── Reset ───────────────────────────────────────────────────────── */
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-display);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      overflow-x: hidden;
+    }
+
+    /* ── Grid noise texture ──────────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(45,212,191,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(45,212,191,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container { max-width: 1160px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+    /* ── Navbar ──────────────────────────────────────────────────────── */
+    .navbar {
+      position: fixed; top: 0; width: 100%;
+      background: rgba(14,17,23,.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      z-index: 1000; padding: .9rem 0;
+    }
+    .nav-content { display:flex; justify-content:space-between; align-items:center; }
+    .nav-logo {
+      font-family: var(--font-mono);
+      font-size: 1.1rem; font-weight: 600;
+      color: var(--teal);
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .nav-logo span { color: var(--muted2); font-weight: 300; }
+    .nav-links { display:flex; list-style:none; gap:2rem; align-items:center; }
+    .nav-links a {
+      color: var(--muted2); text-decoration:none;
+      font-size: .9rem; font-weight: 600; letter-spacing:.03em;
+      transition: color var(--transition);
+    }
+    .nav-links a:hover { color: var(--teal); }
+    .nav-badge {
+      background: var(--bg3); border: 1px solid var(--border);
+      font-family: var(--font-mono); font-size: .72rem;
+      padding: .25rem .6rem; border-radius: 4px; color: var(--teal);
+    }
+    .hamburger {
+      display:none; background:none; border:none; color:var(--text);
+      font-size: 1.4rem; cursor:pointer; padding: .25rem;
+    }
+    .mobile-menu {
+      display:none; flex-direction:column;
+      background: var(--bg2); border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem; gap: 1rem;
+    }
+    .mobile-menu.open { display:flex; }
+    .mobile-menu a {
+      color: var(--muted2); text-decoration:none;
+      font-size: .95rem; font-weight: 600;
+      padding: .4rem 0; border-bottom: 1px solid var(--border);
+    }
+    .mobile-menu a:last-child { border-bottom: none; }
+
+    /* ── Hero ────────────────────────────────────────────────────────── */
+    .hero { padding: 130px 0 70px; text-align:center; }
+    .hero-tag {
+      display: inline-flex; align-items:center; gap:.5rem;
+      font-family: var(--font-mono); font-size:.75rem; font-weight:500;
+      color: var(--teal); background: rgba(45,212,191,.08);
+      border: 1px solid rgba(45,212,191,.2);
+      padding: .35rem .85rem; border-radius:20px;
+      margin-bottom: 1.5rem; letter-spacing:.05em;
+    }
+    .hero h1 {
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 800; line-height: 1.1;
+      margin-bottom: 1.2rem;
+      background: linear-gradient(135deg, #e2e8f0 30%, #2dd4bf 80%);
+      -webkit-background-clip: text; -webkit-text-fill-color:transparent; background-clip:text;
+    }
+    .hero p {
+      font-size: 1.1rem; color: var(--muted2);
+      max-width: 540px; margin: 0 auto 2.5rem;
+    }
+    .hero-stats {
+      display: flex; justify-content:center; gap: 2.5rem;
+      margin-bottom: 2.5rem; flex-wrap:wrap;
+    }
+    .stat { text-align:center; }
+    .stat-val {
+      font-family: var(--font-mono);
+      font-size: 1.6rem; font-weight: 600; color: var(--teal);
+      display:block;
+    }
+    .stat-label { font-size: .8rem; color: var(--muted); letter-spacing:.04em; }
+
+    /* ── Demo Tabs ───────────────────────────────────────────────────── */
+    .demo-wrapper { max-width: 760px; margin: 0 auto; }
+    .demo-tabs {
+      display:flex; gap:.5rem; margin-bottom:0;
+      border-bottom: 1px solid var(--border);
+    }
+    .demo-tab-btn {
+      background:none; border:none; color:var(--muted); cursor:pointer;
+      font-family: var(--font-mono); font-size:.82rem; font-weight:500;
+      padding:.6rem 1rem; border-bottom:2px solid transparent;
+      transition: all var(--transition); letter-spacing:.03em;
+    }
+    .demo-tab-btn.active { color:var(--teal); border-bottom-color:var(--teal); }
+    .demo-tab-btn:hover:not(.active) { color: var(--text); }
+
+    .demo-panel { display:none; }
+    .demo-panel.active { display:block; }
+
+    .demo-container {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      padding: 1.75rem;
+    }
+
+    /* ── Inputs ──────────────────────────────────────────────────────── */
+    .input-group { display:flex; gap:.75rem; margin-bottom:1.25rem; }
+    .field-row { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; margin-bottom:1rem; }
+    .field-label {
+      display:block; font-family:var(--font-mono); font-size:.72rem;
+      color:var(--muted); margin-bottom:.35rem; letter-spacing:.04em;
+    }
+    .email-input, .domain-input {
+      flex:1; width:100%;
+      padding:.7rem 1rem;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      font-family: var(--font-mono); font-size:.9rem;
+      transition: border-color var(--transition);
+    }
+    .email-input:focus, .domain-input:focus {
+      outline:none; border-color:var(--teal);
+      box-shadow: 0 0 0 3px rgba(45,212,191,.12);
+    }
+    .bulk-textarea {
+      width:100%; min-height:100px;
+      padding:.7rem 1rem;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      font-family: var(--font-mono); font-size:.85rem;
+      resize: vertical; transition: border-color var(--transition);
+    }
+    .bulk-textarea:focus {
+      outline:none; border-color:var(--teal);
+      box-shadow: 0 0 0 3px rgba(45,212,191,.12);
+    }
+
+    .validate-btn {
+      padding:.7rem 1.4rem;
+      background: var(--teal); color: var(--bg);
+      border:none; border-radius:var(--radius);
+      font-family:var(--font-display); font-weight:700;
+      font-size:.88rem; cursor:pointer;
+      transition: all var(--transition); white-space:nowrap;
+    }
+    .validate-btn:hover:not(:disabled) {
+      background: #5eead4; transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(45,212,191,.35);
+    }
+    .validate-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+
+    /* ── DNS toggle ──────────────────────────────────────────────────── */
+    .toggle-row {
+      display:flex; align-items:center; gap:.6rem;
+      margin-bottom:1.25rem;
+    }
+    .toggle {
+      position:relative; width:36px; height:20px; cursor:pointer;
+    }
+    .toggle input { opacity:0; width:0; height:0; }
+    .toggle-slider {
+      position:absolute; inset:0; background:var(--bg3);
+      border:1px solid var(--border2); border-radius:20px;
+      transition: background var(--transition);
+    }
+    .toggle-slider::before {
+      content:''; position:absolute;
+      width:14px; height:14px; border-radius:50%;
+      background:var(--muted); top:2px; left:2px;
+      transition: all var(--transition);
+    }
+    .toggle input:checked + .toggle-slider { background:var(--teal-dim); border-color:var(--teal); }
+    .toggle input:checked + .toggle-slider::before { background:var(--teal); transform:translateX(16px); }
+    .toggle-label { font-family:var(--font-mono); font-size:.8rem; color:var(--muted2); }
+
+    /* ── Results ─────────────────────────────────────────────────────── */
+    .results-area {
+      background:var(--bg); border:1px solid var(--border);
+      border-radius:var(--radius); padding:1rem; min-height:110px;
+    }
+    .result-placeholder {
+      text-align:center; color:var(--muted);
+      font-family:var(--font-mono); font-size:.82rem;
+      padding:1.5rem 0;
+    }
+    .result-placeholder i { display:block; font-size:1.5rem; margin-bottom:.5rem; opacity:.4; }
+    .loading { display:none; text-align:center; padding:1.5rem 0; color:var(--teal); }
+    .spinner {
+      display:inline-block; width:22px; height:22px;
+      border:2px solid var(--border2); border-radius:50%;
+      border-top-color:var(--teal);
+      animation:spin 1s linear infinite; margin-bottom:.4rem;
+    }
+    .loading-text { font-family:var(--font-mono); font-size:.8rem; color:var(--muted); }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    .result-card { display:none; }
+    .result-header {
+      display:flex; align-items:center; gap:.6rem;
+      font-weight:700; font-size:1rem; margin-bottom:.85rem;
+    }
+    .result-header.valid   { color:var(--green); }
+    .result-header.risky   { color:var(--yellow); }
+    .result-header.invalid { color:var(--red); }
+    .result-header.error   { color:var(--red); }
+
+    /* ── Confidence bar ──────────────────────────────────────────────── */
+    .confidence-row {
+      display:flex; align-items:center; gap:.75rem;
+      margin-bottom:.85rem; flex-wrap:wrap;
+    }
+    .confidence-label-text {
+      font-family:var(--font-mono); font-size:.75rem; color:var(--muted2); white-space:nowrap;
+    }
+    .confidence-bar-wrap {
+      flex:1; height:6px; background:var(--bg3);
+      border-radius:3px; overflow:hidden; min-width:80px;
+    }
+    .confidence-bar {
+      height:100%; border-radius:3px;
+      transition:width .6s ease, background .6s ease;
+    }
+    .confidence-score-badge {
+      font-family:var(--font-mono); font-size:.78rem; font-weight:600;
+      padding:.15rem .5rem; border-radius:4px;
+    }
+    .confidence-score-badge.very_low  { background:rgba(52,211,153,.12); color:var(--green); }
+    .confidence-score-badge.low       { background:rgba(52,211,153,.08); color:#6ee7b7; }
+    .confidence-score-badge.medium    { background:rgba(251,191,36,.1);  color:var(--yellow); }
+    .confidence-score-badge.high      { background:rgba(248,113,113,.1); color:#fca5a5; }
+    .confidence-score-badge.very_high { background:rgba(248,113,113,.15);color:var(--red); }
+
+    /* Reasons list */
+    .reasons-list {
+      list-style:none; margin-bottom:.85rem;
+      display:flex; flex-direction:column; gap:.3rem;
+    }
+    .reasons-list li {
+      font-family:var(--font-mono); font-size:.75rem; color:var(--muted2);
+      display:flex; align-items:flex-start; gap:.4rem;
+    }
+    .reasons-list li i { color:var(--yellow); margin-top:.15rem; flex-shrink:0; }
+
+    .result-json {
+      background:var(--bg); padding:.85rem 1rem;
+      border-radius:6px; font-family:var(--font-mono);
+      font-size:.82rem; overflow-x:auto;
+      border:1px solid var(--border); white-space:pre;
+    }
+    .json-key     { color:#93c5fd; }
+    .json-string  { color:#86efac; }
+    .json-boolean { color:#fbbf24; }
+    .json-null    { color:#f87171; }
+    .json-number  { color:#c4b5fd; }
+
+    /* ── Rate limit pill ─────────────────────────────────────────────── */
+    .rate-pill {
+      display:inline-flex; align-items:center; gap:.4rem;
+      font-family:var(--font-mono); font-size:.72rem;
+      background:var(--bg3); border:1px solid var(--border);
+      padding:.2rem .6rem; border-radius:4px; color:var(--muted2);
+      margin-bottom:1rem;
+    }
+    .rate-pill .dot { width:6px; height:6px; border-radius:50%; background:var(--green); }
+
+    /* ── Bulk summary ────────────────────────────────────────────────── */
+    .bulk-summary {
+      display:grid; grid-template-columns:repeat(3,1fr);
+      gap:.75rem; margin-bottom:1rem;
+    }
+    .bulk-stat {
+      background:var(--bg3); border:1px solid var(--border);
+      border-radius:var(--radius); padding:.75rem;
+      text-align:center;
+    }
+    .bulk-stat-val { font-family:var(--font-mono); font-size:1.4rem; font-weight:600; }
+    .bulk-stat-val.valid   { color:var(--green); }
+    .bulk-stat-val.invalid { color:var(--red); }
+    .bulk-stat-val.risky   { color:var(--yellow); }
+    .bulk-stat-lbl { font-size:.72rem; color:var(--muted); }
+    .bulk-items { display:flex; flex-direction:column; gap:.4rem; max-height:200px; overflow-y:auto; }
+    .bulk-item {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:.4rem .6rem; background:var(--bg3);
+      border:1px solid var(--border); border-radius:6px;
+      font-family:var(--font-mono); font-size:.78rem;
+    }
+    .bulk-item-email { color:var(--muted2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bulk-badge {
+      padding:.1rem .4rem; border-radius:3px; font-size:.7rem; font-weight:600; flex-shrink:0;
+    }
+    .bulk-badge.valid   { background:rgba(52,211,153,.12); color:var(--green); }
+    .bulk-badge.invalid { background:rgba(248,113,113,.12); color:var(--red); }
+    .bulk-badge.risky   { background:rgba(251,191,36,.1);   color:var(--yellow); }
+
+    /* ── Features ────────────────────────────────────────────────────── */
+    .features { padding:80px 0; background:var(--bg2); border-top:1px solid var(--border); }
+    .section-title {
+      text-align:center; font-size:clamp(1.8rem,3vw,2.4rem);
+      font-weight:800; margin-bottom:3rem;
+    }
+    .section-title span { color:var(--teal); }
+    .features-grid {
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1.25rem;
+    }
+    .feature-card {
+      background:var(--bg); border:1px solid var(--border);
+      padding:1.75rem; border-radius:var(--radius);
+      transition:all var(--transition);
+      position:relative; overflow:hidden;
+    }
+    .feature-card::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg, var(--teal), var(--blue));
+      transform:scaleX(0); transform-origin:left;
+      transition:transform var(--transition);
+    }
+    .feature-card:hover { border-color:var(--border2); transform:translateY(-3px); }
+    .feature-card:hover::before { transform:scaleX(1); }
+    .feature-icon {
+      width:44px; height:44px; border-radius:10px;
+      background:rgba(45,212,191,.1); border:1px solid rgba(45,212,191,.2);
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.1rem; color:var(--teal); margin-bottom:1rem;
+    }
+    .feature-card h3 { font-size:1rem; font-weight:700; margin-bottom:.5rem; }
+    .feature-card p { font-size:.88rem; color:var(--muted2); line-height:1.6; }
+
+    /* ── Documentation ───────────────────────────────────────────────── */
+    .documentation { padding:80px 0; }
+
+    .endpoint-card {
+      background:var(--bg2); border:1px solid var(--border);
+      border-radius:var(--radius); padding:1.5rem;
+      margin-bottom:1.5rem;
+    }
+    .endpoint-card-header {
+      display:flex; align-items:center; gap:.75rem;
+      margin-bottom:1rem; flex-wrap:wrap;
+    }
+    .method-badge {
+      font-family:var(--font-mono); font-size:.72rem; font-weight:600;
+      padding:.25rem .6rem; border-radius:4px;
+    }
+    .method-badge.post { background:rgba(96,165,250,.15); color:var(--blue); border:1px solid rgba(96,165,250,.2); }
+    .method-badge.get  { background:rgba(52,211,153,.12); color:var(--green); border:1px solid rgba(52,211,153,.2); }
+    .endpoint-url {
+      font-family:var(--font-mono); font-size:.83rem;
+      background:var(--bg); padding:.35rem .75rem;
+      border:1px solid var(--border); border-radius:6px;
+      color:var(--muted2); word-break:break-all;
+    }
+    .endpoint-desc { font-size:.88rem; color:var(--muted2); margin-bottom:1rem; }
+
+    .params-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .params-table th {
+      text-align:left; padding:.5rem .75rem;
+      font-family:var(--font-mono); font-size:.72rem; font-weight:500;
+      color:var(--muted); letter-spacing:.04em;
+      border-bottom:1px solid var(--border);
+    }
+    .params-table td {
+      padding:.5rem .75rem; border-bottom:1px solid var(--border);
+      vertical-align:top;
+    }
+    .params-table tr:last-child td { border-bottom:none; }
+    .param-name { font-family:var(--font-mono); color:var(--blue); }
+    .param-type { font-family:var(--font-mono); color:var(--teal); font-size:.78rem; }
+    .param-req  { font-family:var(--font-mono); color:var(--yellow); font-size:.75rem; }
+    .param-opt  { font-family:var(--font-mono); color:var(--muted); font-size:.75rem; }
+
+    /* Code examples */
+    .doc-section { margin-bottom:2rem; }
+    .doc-section > h3 {
+      font-family:var(--font-mono); font-size:.8rem; font-weight:500;
+      color:var(--muted); letter-spacing:.06em; text-transform:uppercase;
+      margin-bottom:1rem; padding-bottom:.5rem; border-bottom:1px solid var(--border);
+    }
+
+    .code-tabs { display:flex; gap:.25rem; flex-wrap:wrap; margin-bottom:0; }
+    .code-tab-btn {
+      background:var(--bg3); border:1px solid var(--border);
+      color:var(--muted2); cursor:pointer;
+      font-family:var(--font-mono); font-size:.75rem;
+      padding:.4rem .8rem; border-radius:6px 6px 0 0;
+      border-bottom:none; transition:all var(--transition);
+    }
+    .code-tab-btn.active { background:var(--bg2); color:var(--teal); border-color:var(--border2); }
+
+    .code-block {
+      background:var(--bg); border:1px solid var(--border);
+      border-radius:0 var(--radius) var(--radius) var(--radius);
+      padding:1.25rem 1rem; font-family:var(--font-mono);
+      font-size:.83rem; overflow-x:auto; position:relative;
+    }
+    .code-block pre { margin:0; white-space:pre; }
+    .copy-btn {
+      position:absolute; top:.75rem; right:.75rem;
+      background:var(--bg3); border:1px solid var(--border);
+      color:var(--muted2); padding:.3rem .65rem;
+      border-radius:5px; cursor:pointer; font-size:.72rem;
+      font-family:var(--font-mono); transition:all var(--transition);
+    }
+    .copy-btn:hover { background:var(--border); color:var(--text); }
+    .copy-btn.copied { color:var(--green); border-color:var(--green); }
+
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+
+    /* Response examples */
+    .response-grid { display:grid; gap:1rem; margin-top:1rem; }
+    .response-block {
+      background:var(--bg); border:1px solid var(--border);
+      border-radius:var(--radius); overflow:hidden;
+    }
+    .response-block-header {
+      display:flex; align-items:center; gap:.5rem;
+      padding:.5rem 1rem; border-bottom:1px solid var(--border);
+      font-family:var(--font-mono); font-size:.75rem;
+    }
+    .status-dot { width:8px; height:8px; border-radius:50%; }
+    .status-dot.green  { background:var(--green); }
+    .status-dot.yellow { background:var(--yellow); }
+    .status-dot.red    { background:var(--red); }
+    .response-block pre {
+      font-family:var(--font-mono); font-size:.8rem;
+      padding:1rem; overflow-x:auto; white-space:pre; margin:0;
+    }
+
+    /* ── Limits / Rate ───────────────────────────────────────────────── */
+    .limits-section { padding:60px 0; background:var(--bg2); border-top:1px solid var(--border); }
+    .limits-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; }
+    .limit-card {
+      background:var(--bg); border:1px solid var(--border);
+      border-radius:var(--radius); padding:1.5rem; text-align:center;
+    }
+    .limit-val {
+      font-family:var(--font-mono); font-size:2rem; font-weight:600;
+      color:var(--teal); display:block; margin-bottom:.25rem;
+    }
+    .limit-label { font-size:.85rem; color:var(--muted2); }
+    .limit-sub { font-size:.75rem; color:var(--muted); margin-top:.25rem; }
+
+    /* ── About ───────────────────────────────────────────────────────── */
+    .about { padding:70px 0; text-align:center; background:var(--bg); border-top:1px solid var(--border); }
+    .about p { color:var(--muted2); font-size:1rem; max-width:500px; margin:0 auto .75rem; }
+    .about-links { display:flex; justify-content:center; gap:1rem; margin-top:1.5rem; flex-wrap:wrap; }
+    .about-btn {
+      display:inline-flex; align-items:center; gap:.5rem;
+      background:var(--bg3); border:1px solid var(--border);
+      color:var(--text); text-decoration:none;
+      padding:.65rem 1.25rem; border-radius:var(--radius);
+      font-size:.88rem; font-weight:600;
+      transition:all var(--transition);
+    }
+    .about-btn:hover { border-color:var(--teal); color:var(--teal); }
+    .about-btn i { font-size:1rem; }
+
+    /* ── Footer ──────────────────────────────────────────────────────── */
+    .footer {
+      padding:1.5rem 0; text-align:center;
+      color:var(--muted); font-size:.82rem;
+      border-top:1px solid var(--border);
+      font-family:var(--font-mono);
+    }
+
+    /* ── Responsive ──────────────────────────────────────────────────── */
+    @media (max-width:768px) {
+      .nav-links { display:none; }
+      .hamburger { display:block; }
+      .hero { padding:100px 0 50px; }
+      .hero-stats { gap:1.5rem; }
+      .input-group { flex-direction:column; }
+      .field-row { grid-template-columns:1fr; }
+      .bulk-summary { grid-template-columns:repeat(3,1fr); }
+      .endpoint-card-header { flex-direction:column; align-items:flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navbar ──────────────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <div class="container">
+    <div class="nav-content">
+      <div class="nav-logo">
+        <i class="fas fa-shield-halved"></i>
+        EmailGuard <span>/ API</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="#demo">Live Demo</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#documentation">Docs</a></li>
+        <li><a href="#limits">Limits</a></li>
+        <li><a href="#about">About</a></li>
+        <li><span class="nav-badge">v2.1</span></li>
+      </ul>
+      <button class="hamburger" id="hamburger" aria-label="Menu">
+        <i class="fas fa-bars"></i>
+      </button>
+    </div>
+  </div>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#demo">Live Demo</a>
+    <a href="#features">Features</a>
+    <a href="#documentation">Docs</a>
+    <a href="#limits">Limits</a>
+    <a href="#about">About</a>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────────────────────────────── -->
+<section class="hero" id="demo">
+  <div class="container">
+    <div class="hero-tag"><i class="fas fa-circle-check"></i> 9,241 domains blocked · v2.1</div>
+    <h1>Detect Disposable Emails<br>Before They Reach You</h1>
+    <p>A fast, free API with DNS verification, confidence scoring, bulk checks, and 1-hour rate limiting.</p>
+
+    <div class="hero-stats">
+      <div class="stat">
+        <span class="stat-val">9,241</span>
+        <span class="stat-label">BLOCKED DOMAINS</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">3</span>
+        <span class="stat-label">ENDPOINTS</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">50/h</span>
+        <span class="stat-label">FREE RATE LIMIT</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">0ms</span>
+        <span class="stat-label">DB OVERHEAD</span>
+      </div>
+    </div>
+
+    <!-- Demo tabs: Single / Bulk / Domain -->
+    <div class="demo-wrapper">
+      <div class="demo-tabs">
+        <button class="demo-tab-btn active" data-panel="single">Single Email</button>
+        <button class="demo-tab-btn" data-panel="bulk">Bulk (up to 50)</button>
+        <button class="demo-tab-btn" data-panel="domain">Domain Check</button>
+      </div>
+
+      <!-- Single -->
+      <div class="demo-panel active" id="panel-single">
+        <div class="demo-container">
+          <div id="ratePill" class="rate-pill" style="display:none;">
+            <span class="dot"></span>
+            <span id="ratePillText">-- requests remaining this hour</span>
+          </div>
+          <div class="input-group">
+            <input type="email" class="email-input" id="emailInput" placeholder="test@mailinator.com" />
+            <button class="validate-btn" id="validateBtn"><i class="fas fa-bolt"></i> Verify</button>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle">
+              <input type="checkbox" id="dnsToggle" checked />
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Enable DNS / MX check</span>
+          </div>
+          <div class="results-area" id="resultsArea">
+            <div class="loading" id="loading">
+              <div class="spinner"></div>
+              <div class="loading-text">Querying DNS &amp; blocklist...</div>
+            </div>
+            <div class="result-card" id="resultCard">
+              <div class="result-header" id="resultHeader"></div>
+              <div class="confidence-row" id="confidenceRow" style="display:none;">
+                <span class="confidence-label-text">Confidence</span>
+                <div class="confidence-bar-wrap">
+                  <div class="confidence-bar" id="confidenceBar"></div>
+                </div>
+                <span class="confidence-score-badge" id="confidenceBadge"></span>
+              </div>
+              <ul class="reasons-list" id="reasonsList"></ul>
+              <pre class="result-json" id="resultJson"></pre>
+            </div>
+            <div class="result-placeholder" id="resultPlaceholder">
+              <i class="fas fa-envelope-open-text"></i>
+              Enter an email to see the full API response
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bulk -->
+      <div class="demo-panel" id="panel-bulk">
+        <div class="demo-container">
+          <label class="field-label">EMAILS (one per line, max 50)</label>
+          <textarea class="bulk-textarea" id="bulkInput" placeholder="test@mailinator.com&#10;hello@gmail.com&#10;user@guerrillamail.com"></textarea>
+          <div class="toggle-row" style="margin-top:.75rem;">
+            <label class="toggle">
+              <input type="checkbox" id="bulkDnsToggle" />
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">DNS check (slower but more accurate)</span>
+          </div>
+          <button class="validate-btn" id="bulkBtn" style="width:100%;margin-bottom:1rem;">
+            <i class="fas fa-list-check"></i> Verify All
+          </button>
+          <div class="results-area" id="bulkResults">
+            <div class="loading" id="bulkLoading">
+              <div class="spinner"></div>
+              <div class="loading-text">Checking emails...</div>
+            </div>
+            <div id="bulkResultCard" style="display:none;"></div>
+            <div class="result-placeholder" id="bulkPlaceholder">
+              <i class="fas fa-layer-group"></i>
+              Paste emails above, one per line
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Domain -->
+      <div class="demo-panel" id="panel-domain">
+        <div class="demo-container">
+          <div class="input-group">
+            <input type="text" class="domain-input" id="domainInput" placeholder="mailinator.com" />
+            <button class="validate-btn" id="domainBtn"><i class="fas fa-magnifying-glass"></i> Check</button>
+          </div>
+          <div class="results-area" id="domainResults">
+            <div class="loading" id="domainLoading">
+              <div class="spinner"></div>
+              <div class="loading-text">Resolving domain...</div>
+            </div>
+            <div class="result-card" id="domainResultCard">
+              <div class="result-header" id="domainResultHeader"></div>
+              <div class="confidence-row" id="domainConfRow" style="display:none;">
+                <span class="confidence-label-text">Confidence</span>
+                <div class="confidence-bar-wrap">
+                  <div class="confidence-bar" id="domainConfBar"></div>
+                </div>
+                <span class="confidence-score-badge" id="domainConfBadge"></span>
+              </div>
+              <ul class="reasons-list" id="domainReasonsList"></ul>
+              <pre class="result-json" id="domainJson"></pre>
+            </div>
+            <div class="result-placeholder" id="domainPlaceholder">
+              <i class="fas fa-globe"></i>
+              Enter a domain name to inspect it
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Features ───────────────────────────────────────────────────────── -->
+<section class="features" id="features">
+  <div class="container">
+    <h2 class="section-title">Why <span>EmailGuard</span>?</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-database"></i></div>
+        <h3>9,241 Blocked Domains</h3>
+        <p>Merged from three community blocklists — nearly 2× larger than v1, auto-updated with every redeploy.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-gauge-high"></i></div>
+        <h3>Confidence Scoring</h3>
+        <p>0–100 score with label (very_low → very_high) across 8 independent signals: blocklist, MX, DNS, pattern analysis, and more.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-server"></i></div>
+        <h3>DNS + MX Verification</h3>
+        <p>Checks if the domain actually exists and can receive email, catching invalid domains that aren't yet in the blocklist.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-layer-group"></i></div>
+        <h3>Bulk Endpoint</h3>
+        <p>Verify up to 50 emails in a single request with a per-request summary — great for batch cleanups.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-clock"></i></div>
+        <h3>Proper Rate Limiting</h3>
+        <p>In-memory 1-hour sliding window with correct RFC headers: <code>X-RateLimit-Limit</code>, <code>Remaining</code>, <code>Reset</code>.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-code"></i></div>
+        <h3>Clean JSON API</h3>
+        <p>Consistent response shape across all endpoints. No SDK required — works with any HTTP client.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Documentation ──────────────────────────────────────────────────── -->
+<section class="documentation" id="documentation">
+  <div class="container">
+    <h2 class="section-title">API <span>Reference</span></h2>
+
+    <!-- Endpoint 1: Verify -->
+    <div class="endpoint-card">
+      <div class="endpoint-card-header">
+        <span class="method-badge post">POST</span>
+        <code class="endpoint-url" id="url-verify">https://email-validator-api-uk66.onrender.com/v1/verify</code>
+      </div>
+      <p class="endpoint-desc">Validate a single email address. Returns verdict, confidence score, DNS info, and reasons.</p>
+
+      <div class="doc-section">
+        <h3>Request Body</h3>
+        <table class="params-table">
+          <thead>
+            <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">email</td>
+              <td class="param-type">string</td>
+              <td class="param-req">required</td>
+              <td>Email address to validate</td>
+            </tr>
+            <tr>
+              <td class="param-name">check_dns</td>
+              <td class="param-type">boolean</td>
+              <td class="param-opt">optional</td>
+              <td>Enable DNS + MX lookup. Default: <code>true</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section">
+        <h3>Response Headers</h3>
+        <table class="params-table">
+          <thead><tr><th>Header</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td class="param-name">X-RateLimit-Limit</td><td>Max requests per hour for your tier</td></tr>
+            <tr><td class="param-name">X-RateLimit-Remaining</td><td>Requests left in current window</td></tr>
+            <tr><td class="param-name">X-RateLimit-Reset</td><td>Unix epoch when the window resets</td></tr>
+            <tr><td class="param-name">Retry-After</td><td>Seconds to wait (only on 429)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section">
+        <h3>Code Examples</h3>
+        <div class="code-tabs">
+          <button class="code-tab-btn active" data-group="verify" data-tab="curl-v">cURL</button>
+          <button class="code-tab-btn" data-group="verify" data-tab="js-v">JavaScript</button>
+          <button class="code-tab-btn" data-group="verify" data-tab="py-v">Python</button>
+          <button class="code-tab-btn" data-group="verify" data-tab="php-v">PHP</button>
+          <button class="code-tab-btn" data-group="verify" data-tab="go-v">Go</button>
+          <button class="code-tab-btn" data-group="verify" data-tab="java-v">Java</button>
+        </div>
+
+        <div class="tab-content active" id="curl-v">
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyBlock(this)">Copy</button>
+            <pre>curl -X POST https://email-validator-api-uk66.onrender.com/v1/verify \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@mailinator.com", "check_dns": true}'</pre>
+          </div>
+        </div>
+        <div class="tab-content" id="js-v">
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyBlock(this)">Copy</button>
+            <pre>const res = await fetch('https://email-validator-api-uk66.onrender.com/v1/verify', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: 'test@mailinator.com', check_dns: true })
+});
+const data = await res.json();
+console.log(data.confidence.label, data.verdict);</pre>
+          </div>
+        </div>
+        <div class="tab-content" id="py-v">
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyBlock(this)">Copy</button>
+            <pre>import requests
+
+resp = requests.post(
+    'https://email-validator-api-uk66.onrender.com/v1/verify',
+    json={'email': 'test@mailinator.com', 'check_dns': True}
+)
+data = resp.json()
+print(data['confidence']['label'], data['verdict'])</pre>
+          </div>
+        </div>
+        <div class="tab-content" id="php-v">
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyBlock(this)">Copy</button>
+            <pre>&lt;?php
+$ch = curl_init('https://email-validator-api-uk66.onrender.com/v1/verify');
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => json_encode(['email' => 'test@mailinator.com']),
+    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+]);
+$response = json_decode(curl_exec($ch), true);
+echo $response['verdict'];</pre>
+          </div>
+        </div>
+        <div class="tab-content" id="go-v">
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyBlock(this)">Copy</button>
+            <pre>package main
+
+import (
+    "bytes"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+func main() {
+    body := bytes.NewBufferString(`{"email":"test@mailinator.com"}`)
+    resp, _ := http.Post(
+        "https://email-validator-api-uk66.onrender.com/v1/verify",
+        "application/json", body,
+    )
+    defer resp.Body.Close()
+    data, _ := io.ReadAll(resp.Body)
+    fmt.Println(string(data))
+}</pre>
+          </div>
+        </div>
+        <div class="tab-content" id="java-v">
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyBlock(this)">Copy</button>
+            <pre>import java.net.URI;
+import java.net.http.*;
+
+var client = HttpClient.newHttpClient();
+var req = HttpRequest.newBuilder()
+    .uri(URI.create("https://email-validator-api-uk66.onrender.com/v1/verify"))
+    .header("Content-Type", "application/json")
+    .POST(HttpRequest.BodyPublishers.ofString("{\"email\":\"test@mailinator.com\"}"))
+    .build();
+var resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+System.out.println(resp.body());</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-section">
+        <h3>Response Examples</h3>
+        <div class="response-grid">
+          <div class="response-block">
+            <div class="response-block-header">
+              <span class="status-dot green"></span>
+              <span style="color:var(--green);">200 — Valid</span>
+            </div>
+            <pre>{
+  "status": "valid",
+  "verdict": "legitimate",
+  "email": "hello@gmail.com",
+  "domain": "gmail.com",
+  "is_disposable": false,
+  "confidence": { "score": 2, "label": "very_low" },
+  "confidence_score": 2,
+  "risk_level": "low",
+  "reasons": [],
+  "dns": {
+    "domain_exists": true,
+    "has_mx": true,
+    "primary_mx": "gmail-smtp-in.l.google.com"
+  },
+  "checks": {
+    "in_blocklist": false,
+    "suspicious_pattern": false,
+    "dns_checked": true
+  },
+  "rate_limit": { "remaining": 49 }
+}</pre>
+          </div>
+          <div class="response-block">
+            <div class="response-block-header">
+              <span class="status-dot red"></span>
+              <span style="color:var(--red);">200 — Disposable</span>
+            </div>
+            <pre>{
+  "status": "invalid",
+  "verdict": "disposable",
+  "email": "test@mailinator.com",
+  "domain": "mailinator.com",
+  "is_disposable": true,
+  "confidence": { "score": 80, "label": "very_high" },
+  "confidence_score": 80,
+  "risk_level": "high",
+  "reasons": [
+    "Domain is in the known disposable email blocklist"
+  ],
+  "checks": {
+    "in_blocklist": true,
+    "suspicious_pattern": false,
+    "dns_checked": true
+  },
+  "rate_limit": { "remaining": 48 }
+}</pre>
+          </div>
+          <div class="response-block">
+            <div class="response-block-header">
+              <span class="status-dot yellow"></span>
+              <span style="color:var(--yellow);">200 — Suspicious (risky)</span>
+            </div>
+            <pre>{
+  "status": "risky",
+  "verdict": "suspicious",
+  "email": "x@xn--04--jda1b.xn--p1ai",
+  "domain": "xn--04--jda1b.xn--p1ai",
+  "is_disposable": false,
+  "confidence": { "score": 38, "label": "medium" },
+  "confidence_score": 38,
+  "risk_level": "medium",
+  "reasons": [
+    "No MX records found — domain cannot receive email",
+    "Domain name is predominantly numeric"
+  ]
+}</pre>
+          </div>
+          <div class="response-block">
+            <div class="response-block-header">
+              <span class="status-dot red"></span>
+              <span style="color:var(--red);">429 — Rate Limited</span>
+            </div>
+            <pre>{
+  "status": "error",
+  "code": "RATE_LIMIT_EXCEEDED",
+  "message": "Rate limit of 50 requests/hour exceeded. Resets in 42 minute(s).",
+  "retry_after_seconds": 2520,
+  "reset_at": "2025-05-23T15:00:00.000Z"
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Endpoint 2: Bulk -->
+    <div class="endpoint-card">
+      <div class="endpoint-card-header">
+        <span class="method-badge post">POST</span>
+        <code class="endpoint-url">/v1/verify/bulk</code>
+      </div>
+      <p class="endpoint-desc">Verify up to 50 emails in one request. Returns a summary + per-email results array.</p>
+      <div class="doc-section">
+        <h3>Request Body</h3>
+        <table class="params-table">
+          <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td class="param-name">emails</td><td class="param-type">string[]</td><td class="param-req">required</td><td>Array of email strings (max 50)</td></tr>
+            <tr><td class="param-name">check_dns</td><td class="param-type">boolean</td><td class="param-opt">optional</td><td>DNS check per email. Default: <code>false</code> (for speed)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="doc-section">
+        <h3>Response Example</h3>
+        <div class="code-block" style="border-radius:var(--radius);">
+          <button class="copy-btn" onclick="copyBlock(this)">Copy</button>
+          <pre>{
+  "status": "ok",
+  "summary": {
+    "total": 3,
+    "valid": 1,
+    "invalid": 1,
+    "risky": 1
+  },
+  "results": [ /* array of full verify objects */ ]
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Endpoint 3: Domain -->
+    <div class="endpoint-card">
+      <div class="endpoint-card-header">
+        <span class="method-badge get">GET</span>
+        <code class="endpoint-url">/v1/domain/:domain</code>
+      </div>
+      <p class="endpoint-desc">Check a domain directly without specifying the local part. Always performs DNS lookup.</p>
+      <div class="doc-section">
+        <h3>Response Example</h3>
+        <div class="code-block" style="border-radius:var(--radius);">
+          <button class="copy-btn" onclick="copyBlock(this)">Copy</button>
+          <pre>{
+  "status": "ok",
+  "domain": "mailinator.com",
+  "is_disposable": true,
+  "confidence": { "score": 80, "label": "very_high" },
+  "risk_level": "high",
+  "reasons": [ "Domain is in the known disposable email blocklist" ],
+  "dns": {
+    "domain_exists": true,
+    "has_mx": true,
+    "mx_records": [{ "priority": 10, "exchange": "mail.mailinator.com" }],
+    "primary_mx": "mail.mailinator.com"
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Endpoint 4: Rate limit status -->
+    <div class="endpoint-card">
+      <div class="endpoint-card-header">
+        <span class="method-badge get">GET</span>
+        <code class="endpoint-url">/v1/rate-limit/status</code>
+      </div>
+      <p class="endpoint-desc">Check your current rate limit quota without consuming a verification request.</p>
+      <div class="doc-section">
+        <h3>Response Example</h3>
+        <div class="code-block" style="border-radius:var(--radius);">
+          <button class="copy-btn" onclick="copyBlock(this)">Copy</button>
+          <pre>{
+  "status": "ok",
+  "limit": 50,
+  "used": 12,
+  "remaining": 38,
+  "reset_at": "2025-05-23T15:00:00.000Z"
+}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Rate Limits ─────────────────────────────────────────────────────── -->
+<section class="limits-section" id="limits">
+  <div class="container">
+    <h2 class="section-title">Rate <span>Limits</span></h2>
+    <div class="limits-grid">
+      <div class="limit-card">
+        <span class="limit-val">50</span>
+        <div class="limit-label">Requests / hour</div>
+        <div class="limit-sub">Anonymous (by IP)</div>
+      </div>
+      <div class="limit-card">
+        <span class="limit-val">1,000</span>
+        <div class="limit-label">Requests / hour</div>
+        <div class="limit-sub">With API key</div>
+      </div>
+      <div class="limit-card">
+        <span class="limit-val">50</span>
+        <div class="limit-label">Emails / bulk call</div>
+        <div class="limit-sub">One API call consumed</div>
+      </div>
+      <div class="limit-card">
+        <span class="limit-val">1h</span>
+        <div class="limit-label">Window resets</div>
+        <div class="limit-sub">Rolling from first request</div>
+      </div>
+    </div>
+    <p style="text-align:center;color:var(--muted);font-size:.85rem;margin-top:1.5rem;">
+      Need higher limits? <a href="mailto:hi@elvishpatel.in" style="color:var(--teal);text-decoration:none;">Get in touch</a> for an API key.
+    </p>
+  </div>
+</section>
+
+<!-- ── About ───────────────────────────────────────────────────────────── -->
+<section class="about" id="about">
+  <div class="container">
+    <h2 class="section-title">About</h2>
+    <p>Built with <strong>Node.js</strong> + <strong>Express</strong>. Hosted on <strong>Render</strong>. Blocklist merged from three open-source community lists.</p>
+    <p>Developed by <strong>Elvish Patel</strong> — open source, MIT licensed.</p>
+    <div class="about-links">
+      <a href="https://github.com/elvishpatel/disposable-email-checker-api/tree/main" class="about-btn" target="_blank" rel="noopener">
+        <i class="fab fa-github"></i> View on GitHub
+      </a>
+      <a href="https://elvishpatel.in" class="about-btn" target="_blank" rel="noopener">
+        <i class="fas fa-globe"></i> Portfolio
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    &copy; <span id="currentYear"></span> EmailGuard API — MIT License &nbsp;·&nbsp; Built by Elvish Patel
+  </div>
+</footer>
+
+<script>
+  /* ── Constants ─────────────────────────────────────────────────────── */
+  const BASE = 'https://email-validator-api-uk66.onrender.com';
+  document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+  /* ── Mobile menu ───────────────────────────────────────────────────── */
+  document.getElementById('hamburger').addEventListener('click', () => {
+    const m = document.getElementById('mobileMenu');
+    m.classList.toggle('open');
+  });
+  document.querySelectorAll('#mobileMenu a').forEach(a =>
+    a.addEventListener('click', () => document.getElementById('mobileMenu').classList.remove('open'))
+  );
+
+  /* ── Demo panel tabs ───────────────────────────────────────────────── */
+  document.querySelectorAll('.demo-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.demo-tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.demo-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+    });
+  });
+
+  /* ── Code example tabs (grouped) ──────────────────────────────────── */
+  document.querySelectorAll('.code-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = btn.dataset.group;
+      document.querySelectorAll(`.code-tab-btn[data-group="${group}"]`).forEach(b => b.classList.remove('active'));
+      // hide all tab contents in this group
+      const tabId = btn.dataset.tab;
+      // find sibling tabs
+      const parent = btn.closest('.doc-section');
+      parent.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    });
+  });
+
+  /* ── Copy block ────────────────────────────────────────────────────── */
+  function copyBlock(btn) {
+    const pre = btn.nextElementSibling;
+    navigator.clipboard.writeText(pre.textContent).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  /* ── JSON syntax highlight ─────────────────────────────────────────── */
+  function highlight(json) {
+    return json
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(
+        /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+        m => {
+          if (/^"/.test(m)) return /:$/.test(m) ? `<span class="json-key">${m}</span>` : `<span class="json-string">${m}</span>`;
+          if (/true|false/.test(m)) return `<span class="json-boolean">${m}</span>`;
+          if (/null/.test(m)) return `<span class="json-null">${m}</span>`;
+          return `<span class="json-number">${m}</span>`;
+        }
+      );
+  }
+
+  /* ── Confidence UI ─────────────────────────────────────────────────── */
+  const CONF_COLORS = {
+    very_low : '#34d399',
+    low      : '#6ee7b7',
+    medium   : '#fbbf24',
+    high     : '#fca5a5',
+    very_high: '#f87171'
+  };
+
+  function renderConfidence(score, label, barEl, badgeEl, rowEl) {
+    rowEl.style.display = 'flex';
+    barEl.style.width = score + '%';
+    barEl.style.background = CONF_COLORS[label] || '#94a3b8';
+    badgeEl.textContent = score + ' · ' + label.replace('_', ' ');
+    badgeEl.className = 'confidence-score-badge ' + label;
+  }
+
+  function renderReasons(reasons, listEl) {
+    listEl.innerHTML = '';
+    reasons.forEach(r => {
+      const li = document.createElement('li');
+      li.innerHTML = `<i class="fas fa-triangle-exclamation"></i>${r}`;
+      listEl.appendChild(li);
+    });
+  }
+
+  /* ── Rate limit pill ───────────────────────────────────────────────── */
+  function updateRatePill(remaining, limit) {
+    const pill = document.getElementById('ratePill');
+    const txt  = document.getElementById('ratePillText');
+    if (remaining == null) { pill.style.display = 'none'; return; }
+    pill.style.display = 'inline-flex';
+    txt.textContent = `${remaining} / ${limit || 50} requests remaining this hour`;
+  }
+
+  /* ────────────────────────────────────────────────────────────────────
+     SINGLE EMAIL
+  ─────────────────────────────────────────────────────────────────── */
+  const emailInput    = document.getElementById('emailInput');
+  const validateBtn   = document.getElementById('validateBtn');
+  const loading       = document.getElementById('loading');
+  const resultCard    = document.getElementById('resultCard');
+  const resultHeader  = document.getElementById('resultHeader');
+  const resultJson    = document.getElementById('resultJson');
+  const resultPlaceholder = document.getElementById('resultPlaceholder');
+  const confidenceRow = document.getElementById('confidenceRow');
+  const confidenceBar = document.getElementById('confidenceBar');
+  const confidenceBadge = document.getElementById('confidenceBadge');
+  const reasonsList   = document.getElementById('reasonsList');
+  const dnsToggle     = document.getElementById('dnsToggle');
+
+  validateBtn.addEventListener('click', doSingleVerify);
+  emailInput.addEventListener('keypress', e => e.key === 'Enter' && doSingleVerify());
+
+  async function doSingleVerify() {
+    const email = emailInput.value.trim();
+    if (!email) { showSingleError({ message: 'Please enter an email address.' }); return; }
+    setSingleLoading(true);
+    try {
+      const res = await fetch(BASE + '/v1/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, check_dns: dnsToggle.checked })
+      });
+      const data = await res.json();
+      const remaining = res.headers.get('X-RateLimit-Remaining');
+      const limit     = res.headers.get('X-RateLimit-Limit');
+      updateRatePill(remaining, limit);
+      res.ok ? showSingleResult(data) : showSingleError(data);
+    } catch (e) {
+      showSingleError({ message: 'Could not reach the API. Check your connection.' });
+    } finally {
+      setSingleLoading(false);
+    }
+  }
+
+  function setSingleLoading(on) {
+    validateBtn.disabled = on;
+    resultPlaceholder.style.display = 'none';
+    loading.style.display = on ? 'block' : 'none';
+    if (on) resultCard.style.display = 'none';
+  }
+
+  function showSingleResult(data) {
+    resultCard.style.display = 'block';
+    const cls = data.status === 'valid' ? 'valid' : data.status === 'risky' ? 'risky' : 'invalid';
+    const icon = cls === 'valid' ? 'fa-circle-check' : cls === 'risky' ? 'fa-triangle-exclamation' : 'fa-circle-xmark';
+    const label = cls === 'valid' ? 'Legitimate Email' : cls === 'risky' ? 'Suspicious — Review Recommended' : 'Disposable Email Detected';
+    resultHeader.className = 'result-header ' + cls;
+    resultHeader.innerHTML = `<i class="fas ${icon}"></i> ${label}`;
+
+    if (data.confidence) {
+      renderConfidence(data.confidence.score, data.confidence.label, confidenceBar, confidenceBadge, confidenceRow);
+    }
+    if (data.reasons && data.reasons.length) renderReasons(data.reasons, reasonsList);
+    else reasonsList.innerHTML = '';
+
+    resultJson.innerHTML = highlight(JSON.stringify(data, null, 2));
+  }
+
+  function showSingleError(err) {
+    resultCard.style.display = 'block';
+    confidenceRow.style.display = 'none';
+    reasonsList.innerHTML = '';
+    resultHeader.className = 'result-header error';
+    resultHeader.innerHTML = `<i class="fas fa-circle-exclamation"></i> ${err.code === 'RATE_LIMIT_EXCEEDED' ? 'Rate Limit Exceeded' : 'Error'}`;
+    resultJson.innerHTML = highlight(JSON.stringify({ status: 'error', message: err.message || 'Unknown error.' }, null, 2));
+  }
+
+  /* ────────────────────────────────────────────────────────────────────
+     BULK
+  ─────────────────────────────────────────────────────────────────── */
+  document.getElementById('bulkBtn').addEventListener('click', async () => {
+    const raw    = document.getElementById('bulkInput').value.trim();
+    const emails = raw.split('\n').map(e => e.trim()).filter(Boolean);
+    const dns    = document.getElementById('bulkDnsToggle').checked;
+    const resEl  = document.getElementById('bulkResultCard');
+    const ph     = document.getElementById('bulkPlaceholder');
+    const ld     = document.getElementById('bulkLoading');
+    const btn    = document.getElementById('bulkBtn');
+
+    if (!emails.length) return;
+    if (emails.length > 50) {
+      resEl.style.display = 'block'; ph.style.display = 'none';
+      resEl.innerHTML = `<div class="result-header error"><i class="fas fa-circle-exclamation"></i> Maximum 50 emails allowed per bulk request.</div>`;
+      return;
+    }
+
+    btn.disabled = true; ph.style.display = 'none'; ld.style.display = 'block'; resEl.style.display = 'none';
+
+    try {
+      const res  = await fetch(BASE + '/v1/verify/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails, check_dns: dns })
+      });
+      const data = await res.json();
+      ld.style.display = 'none'; resEl.style.display = 'block';
+
+      if (!res.ok) {
+        resEl.innerHTML = `<div class="result-header error"><i class="fas fa-circle-exclamation"></i> ${data.message}</div>`;
+        return;
+      }
+
+      const s = data.summary;
+      resEl.innerHTML = `
+        <div class="bulk-summary">
+          <div class="bulk-stat">
+            <div class="bulk-stat-val valid">${s.valid}</div>
+            <div class="bulk-stat-lbl">Valid</div>
+          </div>
+          <div class="bulk-stat">
+            <div class="bulk-stat-val invalid">${s.invalid}</div>
+            <div class="bulk-stat-lbl">Disposable</div>
+          </div>
+          <div class="bulk-stat">
+            <div class="bulk-stat-val risky">${s.risky}</div>
+            <div class="bulk-stat-lbl">Risky</div>
+          </div>
+        </div>
+        <div class="bulk-items">
+          ${data.results.map(r => {
+            const cls = r.status === 'valid' ? 'valid' : r.status === 'risky' ? 'risky' : 'invalid';
+            return `<div class="bulk-item">
+              <span class="bulk-item-email">${r.email || '—'}</span>
+              <span class="bulk-badge ${cls}">${cls} · ${r.confidence ? r.confidence.score : '?'}</span>
+            </div>`;
+          }).join('')}
+        </div>`;
+    } catch (e) {
+      ld.style.display = 'none'; resEl.style.display = 'block';
+      resEl.innerHTML = `<div class="result-header error"><i class="fas fa-circle-exclamation"></i> Could not reach the API.</div>`;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  /* ────────────────────────────────────────────────────────────────────
+     DOMAIN CHECK
+  ─────────────────────────────────────────────────────────────────── */
+  const domainInput       = document.getElementById('domainInput');
+  const domainBtn         = document.getElementById('domainBtn');
+  const domainLoading     = document.getElementById('domainLoading');
+  const domainResultCard  = document.getElementById('domainResultCard');
+  const domainResultHeader= document.getElementById('domainResultHeader');
+  const domainJson        = document.getElementById('domainJson');
+  const domainPlaceholder = document.getElementById('domainPlaceholder');
+  const domainConfRow     = document.getElementById('domainConfRow');
+  const domainConfBar     = document.getElementById('domainConfBar');
+  const domainConfBadge   = document.getElementById('domainConfBadge');
+  const domainReasonsList = document.getElementById('domainReasonsList');
+
+  domainBtn.addEventListener('click', doDomainCheck);
+  domainInput.addEventListener('keypress', e => e.key === 'Enter' && doDomainCheck());
+
+  async function doDomainCheck() {
+    const domain = domainInput.value.trim().replace(/^https?:\/\//,'').split('/')[0];
+    if (!domain || !domain.includes('.')) {
+      domainResultCard.style.display = 'block'; domainPlaceholder.style.display = 'none';
+      domainResultHeader.className = 'result-header error';
+      domainResultHeader.innerHTML = '<i class="fas fa-circle-exclamation"></i> Enter a valid domain (e.g. mailinator.com)';
+      return;
+    }
+    domainBtn.disabled = true; domainPlaceholder.style.display = 'none';
+    domainLoading.style.display = 'block'; domainResultCard.style.display = 'none';
+
+    try {
+      const res  = await fetch(`${BASE}/v1/domain/${encodeURIComponent(domain)}`);
+      const data = await res.json();
+      domainLoading.style.display = 'none'; domainResultCard.style.display = 'block';
+
+      const cls  = data.risk_level === 'low' ? 'valid' : data.risk_level === 'medium' ? 'risky' : 'invalid';
+      const icon = cls === 'valid' ? 'fa-circle-check' : cls === 'risky' ? 'fa-triangle-exclamation' : 'fa-circle-xmark';
+      domainResultHeader.className = 'result-header ' + cls;
+      domainResultHeader.innerHTML = `<i class="fas ${icon}"></i> ${data.is_disposable ? 'Known Disposable Domain' : cls === 'risky' ? 'Suspicious Domain' : 'Domain Looks Legitimate'}`;
+
+      if (data.confidence) {
+        renderConfidence(data.confidence.score, data.confidence.label, domainConfBar, domainConfBadge, domainConfRow);
+      }
+      if (data.reasons && data.reasons.length) renderReasons(data.reasons, domainReasonsList);
+      else domainReasonsList.innerHTML = '';
+
+      domainJson.innerHTML = highlight(JSON.stringify(data, null, 2));
+    } catch (e) {
+      domainLoading.style.display = 'none'; domainResultCard.style.display = 'block';
+      domainResultHeader.className = 'result-header error';
+      domainResultHeader.innerHTML = '<i class="fas fa-circle-exclamation"></i> Could not reach the API.';
+      domainReasonsList.innerHTML = '';
+    } finally {
+      domainBtn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>
