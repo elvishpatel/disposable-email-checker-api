@@ -1,0 +1,7 @@
+node_modules/
+.env
+rate_limit_data.json
+analytics.json
+api_keys.json
+webhooks.json
+*.log
