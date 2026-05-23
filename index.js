@@ -9,29 +9,25 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : [
-      'http://localhost:3000',
-      'http://127.0.0.1:5500',
-      'null'
-    ];
+  : ['http://localhost:3000', 'http://127.0.0.1:5500'];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(null, false);
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes('*')) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    callback(new Error('Origin not allowed by CORS'));
   },
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-api-key'],
-  credentials: false,
   optionsSuccessStatus: 200
 }));
-
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
 app.set('trust proxy', 1);
 
@@ -706,11 +702,9 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Catch-all → serve frontend
-app.use((req, res) => {
+app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-
 app.listen(PORT, () => {
   console.log(`\n🚀 Email Validator API v2.1 running on port ${PORT}`);
   console.log(`   Domains loaded : ${disposableDomains.size}`);
