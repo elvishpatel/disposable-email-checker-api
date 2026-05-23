@@ -706,7 +706,7 @@ app.get('/health', (req, res) => {
 });
 
 // Catch-all → serve frontend
-app.get('/{*path}', (req, res) => {
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
